@@ -45,6 +45,7 @@ pub enum Network {
     Base,
     Worldchain,
     Zora,
+    OpSepolia
 }
 
 impl Display for Network {
@@ -54,6 +55,7 @@ impl Display for Network {
             Self::Base => f.write_str("base"),
             Self::Worldchain => f.write_str("worldchain"),
             Self::Zora => f.write_str("zora"),
+            Self::OpSepolia => f.write_str("op-sepolia"),
         }
     }
 }
@@ -67,6 +69,7 @@ impl FromStr for Network {
             "base" => Ok(Self::Base),
             "worldchain" => Ok(Self::Worldchain),
             "zora" => Ok(Self::Zora),
+            "op-sepolia" => Ok(Self::OpSepolia),
             _ => Err(eyre::eyre!("network not recognized")),
         }
     }
@@ -86,6 +89,20 @@ impl From<Network> for NetworkConfig {
                     unsafe_signer: address!("AAAA45d9549EDA09E70937013520214382Ffc4A2"),
                     system_config_contract: address!("229047fed2591dbec1eF1118d64F7aF3dB9EB290"),
                     eth_network: EthNetwork::MAINNET,
+                },
+                verify_unsafe_signer: false,
+            },
+            Network::OpSepolia => NetworkConfig {
+                consensus_rpc: Some(
+                    "https://127.0.0.1:3000"
+                        .parse()
+                        .unwrap(),
+                ),
+                chain: ChainConfig {
+                    chain_id: 11155420,
+                    unsafe_signer: address!("57CACBB0d30b01eb2462e5dC940c161aff3230D3"),
+                    system_config_contract: address!("034edd2a225f7f429a63e0f1d2084b9e0a93b538"),
+                    eth_network: EthNetwork::SEPOLIA,
                 },
                 verify_unsafe_signer: false,
             },
