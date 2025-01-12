@@ -48,8 +48,12 @@ fn main() -> Result<()> {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn enable_tracing() {
+    tracing_log::LogTracer::init().expect("Failed to initialize LogTracer");
+
     let env_filter = EnvFilter::builder()
         .with_default_directive("helios_opstack=info".parse().unwrap())
+        .with_default_directive("libp2p_mdns=off".parse().unwrap())
+        .with_default_directive("libp2p_kad=off".parse().unwrap())
         .from_env()
         .expect("invalid env filter");
 

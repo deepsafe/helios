@@ -35,6 +35,8 @@ snap = "1"
 
 # config
 figment = { version = "0.10.7", features = ["toml", "env"] }
+tracing-log = "*"
+
 
 helios-core = { path = "../core" }
 helios-ethereum = { path = "../ethereum" }

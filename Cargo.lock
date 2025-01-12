@@ -3198,6 +3198,7 @@ dependencies = [
  "ssz_types",
  "tokio",
  "tracing",
+ "tracing-log",
  "tracing-subscriber",
  "triehash-ethereum",
  "typenum",

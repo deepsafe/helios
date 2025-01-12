@@ -5,7 +5,7 @@ use std::{
 
 use alloy::{
     primitives::Bytes,
-    rlp::{self, Decodable},
+    rlp::{self, Decodable}, 
 };
 use discv5::{
     enr::{Builder, CombinedKey, Enr, NodeId},
@@ -42,6 +42,10 @@ pub fn start(addr: SocketAddr, chain_id: u64) -> Result<Receiver<SocketAddr>> {
                         .iter()
                         .filter(|node| is_valid_node(node, chain_id))
                         .flat_map(|peer| {
+
+                            let base64_peer = peer.to_base64();
+                            println!("{}",base64_peer);
+
                             if let Some(ip) = peer.ip4() {
                                 return Some(SocketAddr::new(IpAddr::V4(ip), peer.tcp4().unwrap()));
                             }
