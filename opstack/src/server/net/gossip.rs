@@ -57,6 +57,10 @@ impl GossipService {
         let mut peer_recv = discovery::start(self.addr, self.chain_id)?;
         let multiaddr = socket_to_multiaddr(self.addr);
 
+        tracing::info!("peer id {}", swarm.local_peer_id());
+        tracing::info!("multiaddr {}", multiaddr);
+
+
         swarm
             .listen_on(multiaddr)
             .map_err(|_| eyre::eyre!("swarm listen failed"))?;
@@ -174,6 +178,7 @@ impl Behaviour {
             gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Anonymous, gossipsub_config)
                 .map_err(|_| eyre::eyre!("gossipsub behaviour creation failed"))?;
 
+        tracing::info!("start subscribe");
         handler
             .topics()
             .iter()

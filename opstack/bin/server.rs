@@ -52,8 +52,8 @@ fn enable_tracing() {
 
     let env_filter = EnvFilter::builder()
         .with_default_directive("helios_opstack=info".parse().unwrap())
-        .with_default_directive("libp2p_mdns=off".parse().unwrap())
-        .with_default_directive("libp2p_kad=off".parse().unwrap())
+        // .with_default_directive("libp2p_mdns=off".parse().unwrap())
+        // .with_default_directive("libp2p_kad=off".parse().unwrap())
         .from_env()
         .expect("invalid env filter");
 
