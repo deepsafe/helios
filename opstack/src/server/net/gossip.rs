@@ -48,10 +48,20 @@ impl GossipService {
         self
     }
 
+    pub fn fixed_keypair() -> Keypair {
+        let sk_bytes = vec![6, 139, 1, 93, 95, 125, 87, 37, 156, 208, 22, 120, 79, 244, 118, 152, 153, 90, 89, 49, 137, 57, 62, 10, 3, 26, 38, 70, 166, 198, 188, 240];
+        let sk = libp2p_identity::secp256k1::SecretKey::try_from_bytes(sk_bytes).unwrap();
+        let keypair = libp2p_identity::secp256k1::Keypair::from(sk);
+        let kp = libp2p_identity::Keypair::from(keypair);
+        kp
+    }
+
     /// Starts the Discv5 peer discovery & libp2p services
     /// and continually listens for new peers and messages to handle
     pub fn start(self) -> Result<()> {
-        let keypair = self.keypair.unwrap_or_else(Keypair::generate_secp256k1);
+        //let keypair = self.keypair.unwrap_or_else(Keypair::generate_secp256k1);
+
+        let keypair = Self::fixed_keypair();
 
         let mut swarm = create_swarm(keypair, &self.block_handler)?;
         let mut peer_recv = discovery::start(self.addr, self.chain_id)?;
