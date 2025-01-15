@@ -50,6 +50,8 @@ impl GossipService {
 
     pub fn fixed_keypair() -> Keypair {
         let sk_bytes = vec![6, 139, 1, 93, 95, 125, 87, 37, 156, 208, 22, 120, 79, 244, 118, 152, 153, 90, 89, 49, 137, 57, 62, 10, 3, 26, 38, 70, 166, 198, 188, 240];
+        //let sk_bytes = vec![6, 139, 3, 93, 95, 125, 87, 37, 156, 208, 22, 120, 79, 244, 118, 152, 153, 90, 89, 49, 137, 57, 62, 10, 3, 26, 38, 70, 166, 198, 188, 240];
+
         let sk = libp2p_identity::secp256k1::SecretKey::try_from_bytes(sk_bytes).unwrap();
         let keypair = libp2p_identity::secp256k1::Keypair::from(sk);
         let kp = libp2p_identity::Keypair::from(keypair);
@@ -69,6 +71,9 @@ impl GossipService {
 
         tracing::info!("peer id {}", swarm.local_peer_id());
         tracing::info!("multiaddr {}", multiaddr);
+
+
+        swarm.dial("/ip4/172.20.128.155/tcp/9877/p2p/16Uiu2HAmGBpLj5ecnrGCCAiwGqVdKavNdtxtUq92q43rcumn28q9".parse::<Multiaddr>().unwrap()).unwrap();
 
 
         swarm
@@ -145,7 +150,7 @@ fn create_swarm(keypair: Keypair, handler: &BlockHandler) -> Result<Swarm<Behavi
         .multiplex(MplexConfig::default())
         .boxed();
 
-    let behaviour = Behaviour::new(handler)?;
+    let behaviour = Behaviour::new(handler, keypair.clone())?;
 
     Ok(
         SwarmBuilder::with_tokio_executor(transport, behaviour, PeerId::from(keypair.public()))
@@ -161,11 +166,13 @@ struct Behaviour {
     ping: ping::Behaviour,
     /// Adds [libp2p::gossipsub] to enable gossipsub as the routing layer
     gossipsub: gossipsub::Behaviour,
+
+    id: libp2p::identify::Behaviour,
 }
 
 impl Behaviour {
     /// Configures the swarm behaviors, subscribes to the gossip topics, and returns a new [Behaviour]
-    fn new(handler: &BlockHandler) -> Result<Self> {
+    fn new(handler: &BlockHandler, keypair: Keypair) -> Result<Self> {
         let ping = ping::Behaviour::default();
 
         let gossipsub_config = gossipsub::ConfigBuilder::default()
@@ -200,7 +207,10 @@ impl Behaviour {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(Self { ping, gossipsub })
+        let id = libp2p::identify::Behaviour::new(
+            libp2p::identify::Config::new("".to_string(), keypair.public()));
+
+        Ok(Self { ping, gossipsub, id })
     }
 }
 
@@ -211,24 +221,32 @@ enum Event {
     Ping(ping::Event),
     /// Represents a [gossipsub::Event]
     Gossipsub(gossipsub::Event),
+    ID(libp2p::identify::Event),
 }
 
 impl Event {
     /// Handles received gossipsub messages. Ping messages are ignored.
     /// Reports back to [libp2p::gossipsub] to apply peer scoring and forward the message to other peers if accepted.
     fn handle(self, swarm: &mut Swarm<Behaviour>, handler: &BlockHandler) {
-        if let Self::Gossipsub(gossipsub::Event::Message {
-            propagation_source,
-            message_id,
-            message,
-        }) = self
-        {
-            let status = handler.handle(message);
-
-            _ = swarm
-                .behaviour_mut()
-                .gossipsub
-                .report_message_validation_result(&message_id, &propagation_source, status);
+        match  self {
+            Event::Ping(event) => tracing::info!("[Ping] event {event:?} "),
+            Event::Gossipsub(event) => {
+                match event {
+                    gossipsub::Event::Message { propagation_source, message_id, message } => {
+                        let status = handler.handle(message);
+                        _ = swarm
+                        .behaviour_mut()
+                        .gossipsub
+                        .report_message_validation_result(&message_id, &propagation_source, status);
+                    },
+                    gossipsub::Event::Subscribed { peer_id, topic } => tracing::info!("[Subscribed] peer_id {peer_id:?} topic {topic:?}"),
+                    gossipsub::Event::Unsubscribed { peer_id, topic } => tracing::info!("[Unsubscribed] peer_id {peer_id:?} topic {topic:?}"),
+                    gossipsub::Event::GossipsubNotSupported { peer_id } => tracing::info!("[GossipsubNotSupported] peer_id {peer_id:?}"),
+                }
+            },
+            Event::ID(event) => {
+                tracing::info!("[ID] event {:?}", event);
+            },
         }
     }
 }
@@ -244,5 +262,12 @@ impl From<gossipsub::Event> for Event {
     /// Converts [gossipsub::Event] to [Event]
     fn from(value: gossipsub::Event) -> Self {
         Event::Gossipsub(value)
+    }
+}
+
+impl From<libp2p::identify::Event> for Event {
+    /// Converts [ping::Event] to [Event]
+    fn from(value: libp2p::identify::Event) -> Self {
+        Event::ID(value)
     }
 }
