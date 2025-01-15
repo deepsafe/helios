@@ -42,6 +42,7 @@ pub async fn start_server(
     system_config_contract: Address,
     replica_urls: Vec<Url>,
     execution_rpc: Url,
+    fixed_peerid: bool,
 ) -> Result<()> {
     let state = Arc::new(RwLock::new(ServerState::new(
         gossip_addr,
@@ -50,6 +51,7 @@ pub async fn start_server(
         system_config_contract,
         replica_urls,
         execution_rpc,
+        fixed_peerid,
     )?));
 
     let state_copy = state.clone();
@@ -119,11 +121,12 @@ impl ServerState {
         system_config_contract: Address,
         replica_urls: Vec<Url>,
         execution_rpc: Url,
+        fixed_peerid: bool,
     ) -> Result<Self> {
         let (send, commitment_recv) = channel(256);
         poller::start(replica_urls, signer, chain_id, send.clone());
         let handler = BlockHandler::new(signer, chain_id, send);
-        let gossip = GossipService::new(addr, chain_id, handler);
+        let gossip = GossipService::new(addr, chain_id, handler, fixed_peerid);
         gossip.start()?;
 
         Ok(Self {

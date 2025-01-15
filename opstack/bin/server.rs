@@ -26,6 +26,7 @@ async fn main() -> Result<()> {
     let gossip_addr = cli.gossip_address;
     let replica_urls = cli.replica_urls.unwrap_or_default();
     let execution_rpc = cli.execution_rpc;
+    let fixed_peerid = cli.fixed_peerid;
 
     start_server(
         server_addr,
@@ -35,6 +36,7 @@ async fn main() -> Result<()> {
         system_config_contract,
         replica_urls,
         execution_rpc,
+        fixed_peerid,
     )
     .await?;
 
@@ -77,4 +79,6 @@ struct Cli {
     replica_urls: Option<Vec<Url>>,
     #[clap(short, long)]
     execution_rpc: Url,
+    #[clap(short, long)]
+    fixed_peerid: bool,
 }

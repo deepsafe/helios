@@ -30,16 +30,18 @@ pub struct GossipService {
     keypair: Option<Keypair>,
     /// Handler for the block
     block_handler: BlockHandler,
+    fixed_peerid: bool,
 }
 
 impl GossipService {
     /// Creates a new [Service]
-    pub fn new(addr: SocketAddr, chain_id: u64, handler: BlockHandler) -> Self {
+    pub fn new(addr: SocketAddr, chain_id: u64, handler: BlockHandler, fixed_peerid: bool) -> Self {
         Self {
             addr,
             chain_id,
             keypair: None,
             block_handler: handler,
+            fixed_peerid,
         }
     }
 
@@ -62,9 +64,12 @@ impl GossipService {
     /// Starts the Discv5 peer discovery & libp2p services
     /// and continually listens for new peers and messages to handle
     pub fn start(self) -> Result<()> {
-        let keypair = self.keypair.unwrap_or_else(Keypair::generate_secp256k1);
-
-        //let keypair = Self::fixed_keypair();
+        
+        let keypair = if self.fixed_peerid {
+            Self::fixed_keypair()
+        } else {
+            self.keypair.unwrap_or_else(Keypair::generate_secp256k1)
+        };
 
         let mut swarm = create_swarm(keypair, &self.block_handler)?;
         let mut peer_recv = discovery::start(self.addr, self.chain_id)?;
