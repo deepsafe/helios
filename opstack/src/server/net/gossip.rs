@@ -12,6 +12,7 @@ use libp2p::{
     noise, ping,
     swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent},
     tcp, Multiaddr, PeerId, Swarm, Transport,
+    identify
 };
 use libp2p_identity::Keypair;
 use sha2::{Digest, Sha256};
@@ -61,9 +62,9 @@ impl GossipService {
     /// Starts the Discv5 peer discovery & libp2p services
     /// and continually listens for new peers and messages to handle
     pub fn start(self) -> Result<()> {
-        //let keypair = self.keypair.unwrap_or_else(Keypair::generate_secp256k1);
+        let keypair = self.keypair.unwrap_or_else(Keypair::generate_secp256k1);
 
-        let keypair = Self::fixed_keypair();
+        //let keypair = Self::fixed_keypair();
 
         let mut swarm = create_swarm(keypair, &self.block_handler)?;
         let mut peer_recv = discovery::start(self.addr, self.chain_id)?;
@@ -73,7 +74,7 @@ impl GossipService {
         tracing::info!("multiaddr {}", multiaddr);
 
 
-        swarm.dial("/ip4/172.20.128.155/tcp/9877/p2p/16Uiu2HAmGBpLj5ecnrGCCAiwGqVdKavNdtxtUq92q43rcumn28q9".parse::<Multiaddr>().unwrap()).unwrap();
+        //swarm.dial("/ip4/172.20.128.155/tcp/9877/p2p/16Uiu2HAmGBpLj5ecnrGCCAiwGqVdKavNdtxtUq92q43rcumn28q9".parse::<Multiaddr>().unwrap()).unwrap();
 
 
         swarm
@@ -166,8 +167,8 @@ struct Behaviour {
     ping: ping::Behaviour,
     /// Adds [libp2p::gossipsub] to enable gossipsub as the routing layer
     gossipsub: gossipsub::Behaviour,
-
-    id: libp2p::identify::Behaviour,
+    /// Adds [libp2p::identify] to enable identify
+    id: identify::Behaviour,
 }
 
 impl Behaviour {
@@ -195,7 +196,6 @@ impl Behaviour {
             gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Anonymous, gossipsub_config)
                 .map_err(|_| eyre::eyre!("gossipsub behaviour creation failed"))?;
 
-        tracing::info!("start subscribe");
         handler
             .topics()
             .iter()
@@ -207,8 +207,8 @@ impl Behaviour {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let id = libp2p::identify::Behaviour::new(
-            libp2p::identify::Config::new("".to_string(), keypair.public()));
+        let id = identify::Behaviour::new(
+            identify::Config::new("".to_string(), keypair.public()));
 
         Ok(Self { ping, gossipsub, id })
     }
@@ -221,7 +221,8 @@ enum Event {
     Ping(ping::Event),
     /// Represents a [gossipsub::Event]
     Gossipsub(gossipsub::Event),
-    ID(libp2p::identify::Event),
+    /// Represents a [identify::Event]
+    ID(identify::Event),
 }
 
 impl Event {
@@ -229,7 +230,7 @@ impl Event {
     /// Reports back to [libp2p::gossipsub] to apply peer scoring and forward the message to other peers if accepted.
     fn handle(self, swarm: &mut Swarm<Behaviour>, handler: &BlockHandler) {
         match  self {
-            Event::Ping(event) => tracing::info!("[Ping] event {event:?} "),
+            Event::Ping(event) => tracing::debug!("[Ping] event {event:?} "),
             Event::Gossipsub(event) => {
                 match event {
                     gossipsub::Event::Message { propagation_source, message_id, message } => {
@@ -265,9 +266,9 @@ impl From<gossipsub::Event> for Event {
     }
 }
 
-impl From<libp2p::identify::Event> for Event {
-    /// Converts [ping::Event] to [Event]
-    fn from(value: libp2p::identify::Event) -> Self {
+impl From<identify::Event> for Event {
+    /// Converts [identify::Event] to [Event]
+    fn from(value: identify::Event) -> Self {
         Event::ID(value)
     }
 }
