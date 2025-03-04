@@ -66,7 +66,7 @@ pub async fn start_server(
         .route("/latest", get(latest_handler))
         .route("/chain_id", get(chain_id_handler))
         .route(
-            "/unsafe_signer_proof/:block_hash",
+            "/unsafe_signer_proof/{block_hash}",
             get(unsafe_signer_proof_handler),
         )
         .with_state(state);
