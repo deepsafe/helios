@@ -184,7 +184,7 @@ impl Behaviour {
         let gossipsub_config = gossipsub::ConfigBuilder::default()
             .mesh_n(8)
             .mesh_n_low(6)
-            .mesh_n_high(12)
+            .mesh_n_high(30)
             .gossip_lazy(6)
             .heartbeat_interval(Duration::from_millis(500))
             .fanout_ttl(Duration::from_secs(24))
