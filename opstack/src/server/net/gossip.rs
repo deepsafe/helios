@@ -7,13 +7,13 @@ use eyre::Result;
 use libp2p::{
     futures::StreamExt,
     gossipsub::{self, IdentTopic, Message, MessageId},
-    mplex::MplexConfig,
     multiaddr::Protocol,
-    noise, ping,
-    swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent},
+    noise, ping, SwarmBuilder,
+    swarm::{NetworkBehaviour, SwarmEvent},
     tcp, Multiaddr, PeerId, Swarm, Transport,
     identify
 };
+use libp2p_mplex::MplexConfig;
 use libp2p_identity::Keypair;
 use sha2::{Digest, Sha256};
 use tokio::select;
@@ -99,6 +99,8 @@ impl GossipService {
                     event = swarm.select_next_some() => {
                         if let SwarmEvent::Behaviour(event) = event {
                             event.handle(&mut swarm, &self.block_handler);
+                        } else if let SwarmEvent::ConnectionClosed{peer_id, cause, ..} = event {
+                            tracing::info!("[ConnectionClosed] {peer_id} {cause:?}");
                         }
                     },
                 }
@@ -150,16 +152,22 @@ fn compute_message_id(msg: &Message) -> MessageId {
 
 /// Creates the libp2p [Swarm]
 fn create_swarm(keypair: Keypair, handler: &BlockHandler) -> Result<Swarm<Behaviour>> {
-    let transport = tcp::tokio::Transport::new(tcp::Config::default())
-        .upgrade(libp2p::core::upgrade::Version::V1Lazy)
-        .authenticate(noise::Config::new(&keypair)?)
-        .multiplex(MplexConfig::default())
-        .boxed();
+    // let transport = tcp::tokio::Transport::new(tcp::Config::default())
+    //     .upgrade(libp2p::core::upgrade::Version::V1Lazy)
+    //     .authenticate(noise::Config::new(&keypair)?)
+    //     .multiplex(MplexConfig::default())
+    //     .boxed();
 
     let behaviour = Behaviour::new(handler, keypair.clone())?;
 
     Ok(
-        SwarmBuilder::with_tokio_executor(transport, behaviour, PeerId::from(keypair.public()))
+        SwarmBuilder::with_existing_identity(keypair).with_tokio()
+            .with_tcp(
+            tcp::Config::default(),
+            noise::Config::new,
+            MplexConfig::default
+            )?
+            .with_behaviour(|_| behaviour )?
             .build(),
     )
 }
@@ -182,14 +190,15 @@ impl Behaviour {
         let ping = ping::Behaviour::default();
 
         let gossipsub_config = gossipsub::ConfigBuilder::default()
-            .mesh_n(8)
-            .mesh_n_low(6)
+            .mesh_n(13)
+            .mesh_n_low(12)
             .mesh_n_high(30)
-            .gossip_lazy(6)
-            .heartbeat_interval(Duration::from_millis(500))
-            .fanout_ttl(Duration::from_secs(24))
+            .gossip_lazy(12)
+            .support_floodsub()
+            .heartbeat_interval(Duration::from_millis(1000))
+            .fanout_ttl(Duration::from_secs(80))
             .history_length(12)
-            .history_gossip(3)
+            .history_gossip(5)
             .duplicate_cache_time(Duration::from_secs(65))
             .validation_mode(gossipsub::ValidationMode::None)
             .validate_messages()
@@ -239,7 +248,7 @@ impl Event {
             Event::Gossipsub(event) => {
                 match event {
                     gossipsub::Event::Message { propagation_source, message_id, message } => {
-                        let status = handler.handle(message);
+                        let status = handler.handle(message.clone());
                         _ = swarm
                         .behaviour_mut()
                         .gossipsub
@@ -248,10 +257,16 @@ impl Event {
                     gossipsub::Event::Subscribed { peer_id, topic } => tracing::info!("[Subscribed] peer_id {peer_id:?} topic {topic:?}"),
                     gossipsub::Event::Unsubscribed { peer_id, topic } => tracing::info!("[Unsubscribed] peer_id {peer_id:?} topic {topic:?}"),
                     gossipsub::Event::GossipsubNotSupported { peer_id } => tracing::info!("[GossipsubNotSupported] peer_id {peer_id:?}"),
+                    gossipsub::Event::SlowPeer { peer_id,.. } => tracing::info!("[SlowPeer] peer_id {peer_id:?}"),
                 }
             },
             Event::ID(event) => {
                 tracing::info!("[ID] event {:?}", event);
+                let all_mash_peers: Vec<&PeerId> = swarm
+                    .behaviour_mut()
+                    .gossipsub.all_mesh_peers().collect();
+
+                tracing::info!("[ID] all_mash_peers {:?}", all_mash_peers);
             },
         }
     }

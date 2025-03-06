@@ -118,8 +118,8 @@ impl TryFrom<&[u8]> for OpStackEnrData {
     fn try_from(value: &[u8]) -> Result<Self> {
         let mut buffer = value;
         let bytes = Bytes::decode(&mut buffer)?;
-        let (chain_id, rest) = decode::u64(&bytes)?;
-        let (version, _) = decode::u64(rest)?;
+        let (chain_id, rest) = decode::u64(&bytes).unwrap();
+        let (version, _) = decode::u64(rest).unwrap();
 
         Ok(Self { chain_id, version })
     }
